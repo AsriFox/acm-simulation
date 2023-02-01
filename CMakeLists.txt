@@ -35,6 +35,8 @@ FetchContent_MakeAvailable (${AFF3CT_LIB})
 # Compile the main executable
 add_executable (acm-simulation 
     main.cpp
+    # modules.cpp
+    # modules.hpp
 )
 
 # Threads library
@@ -46,3 +48,9 @@ find_package (Threads REQUIRED)
 set (AFF3CT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/_deps/${AFF3CT_LIB}-src/lib/cmake/${AFF3CT_LIB}")
 find_package (AFF3CT CONFIG 3.0.2 REQUIRED)
 target_link_libraries (acm-simulation PRIVATE aff3ct::aff3ct-static-lib)
+
+# OpenMP library
+find_package (OpenMP)
+if (OpenMP_FOUND)
+    target_link_libraries (acm-simulation PRIVATE OpenMP::OpenMP_CXX)
+endif()

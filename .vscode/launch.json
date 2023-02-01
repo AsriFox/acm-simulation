@@ -10,7 +10,11 @@
             "name": "Debug",
             "program": "${workspaceFolder}/build/acm-simulation",
             "terminal": "integrated",
-            "args": [],
+            "args": [
+                "--enc-type", "LDPC_DVBS2",
+                "-N", "16200",
+                "-K", "14400"
+            ],
             "preLaunchTask": "CMake: build",
             "cwd": "${workspaceFolder}/build"
         }
