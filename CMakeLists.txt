@@ -35,8 +35,8 @@ FetchContent_MakeAvailable (${AFF3CT_LIB})
 # Compile the main executable
 add_executable (acm-simulation 
     main.cpp
-    # modules.cpp
-    # modules.hpp
+    modules.cpp
+    modules.hpp
 )
 
 # Threads library
