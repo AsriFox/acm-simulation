@@ -15,6 +15,7 @@ params::params(int argc, char **argv)
         modem.get(),    channel.get(),
         monitor.get(),  terminal.get(),
     };
+    
     tools::Command_parser cp(argc, argv, params_list, true);
     if (cp.parsing_failed()) {
         cp.print_help();
@@ -31,18 +32,18 @@ params::params(int argc, char **argv)
     R = (float)codec->enc->K / (float)codec->enc->N_cw;
 }
 
-modules::modules(const params &p, module::Monitor_BFER<>* monitor) 
+modules::modules(const params &p) 
   : source  (p.source->build()),
     codec   (p.codec->build()),
     modem   (p.modem->build()),
     channel (p.channel->build()),
-    monitor (monitor)
+    monitor (p.monitor->build())
 {
     encoder = &codec->get_encoder();
     decoder = &codec->get_decoder_siho();
     list = { 
-        source.get(), modem.get(), channel.get(),
-        monitor,      encoder,     decoder,
+        source.get(),  modem.get(), channel.get(),
+        monitor.get(), encoder,     decoder,
     };
     for (auto& mod : list) {
         for (auto& tsk : mod->tasks) {
@@ -57,38 +58,19 @@ modules::modules(const params &p, module::Monitor_BFER<>* monitor)
     }
 }
 
-utils::utils() : noise(new tools::Sigma<>()) {}
-
-modules utils::init_modules(const params &p) {
-    const int tid = omp_get_thread_num();
-    p.source->seed += tid;
-    p.channel->seed += tid;
-    monitors[tid].reset(p.monitor->build());
-    modules m(p, monitors[tid].get());
-    m_list[tid] = m.list;
-    return m;
-}
-
-void utils::init(factory::Terminal term_factory) {
-    if (monitors.empty()) throw std::invalid_argument("this->monitors");
-    using namespace tools;
-    monitor_red.reset(new Monitor_reduction<module::Monitor_BFER<>>(monitors));
-    monitor_red->set_reduce_frequency(std::chrono::milliseconds(500));
-    reporters.push_back(std::unique_ptr<Reporter>(
-        new Reporter_noise<>(*noise)
+utils::utils(const params& p, const module::Monitor_BFER<>& monitor) 
+  : noise(new tools::Sigma<>()) 
+{
+    reporters.push_back(upt(tools::Reporter)(
+        new tools::Reporter_noise<>(*noise)
     ));
-    reporters.push_back(std::unique_ptr<Reporter>(
-        new Reporter_BFER<>(*monitor_red)
+    reporters.push_back(upt(tools::Reporter)(
+        new tools::Reporter_BFER<>(monitor)
     ));
-    reporters.push_back(std::unique_ptr<Reporter>(
-        new Reporter_throughput<>(*monitor_red)
+    reporters.push_back(upt(tools::Reporter)(
+        new tools::Reporter_throughput<>(monitor)
     ));
-    terminal.reset(term_factory.build(reporters));
-
-    m_stat.resize(m_list[0].size());
-    for (size_t m = 0; m < m_list[0].size(); m++)
-        for (size_t t = 0; t < m_list.size(); t++)
-            m_stat[m].push_back(m_list[t][m]);
+    terminal.reset(p.terminal->build(reporters));
 }
 
 std::vector<float> modules::bind_sockets() {
@@ -107,9 +89,9 @@ std::vector<float> modules::bind_sockets() {
     return sigma;
 }
 
-void modules::run_sim_chain(const utils &u) {
+void modules::run_sim_chain(const utils& u) {
     using namespace module;
-    while (!u.monitor_red->is_done() && !u.terminal->is_interrupt()) {
+    while (!monitor->fe_limit_achieved() && !u.terminal->is_interrupt()) {
         (*source )[src::tsk::generate    ].exec();
         (*encoder)[enc::tsk::encode      ].exec();
         (*modem  )[mdm::tsk::modulate    ].exec();
