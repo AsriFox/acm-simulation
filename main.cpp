@@ -20,7 +20,17 @@ int main(int argc, char** argv) {
         std::fill(sigma.begin(), sigma.end(), tools::esn0_to_sigma(esn0, p.modem->cpm_upf));
         u.noise->set_values(sigma[0], ebn0, esn0);
         u.terminal->start_temp_report();
-        m.run_sim_chain(u);
+        // m.run_sim_chain(u);
+        using namespace aff3ct::module;
+        while (!m.monitor->fe_limit_achieved() && !u.terminal->is_interrupt()) {
+            (*(m.source) )[src::tsk::generate    ].exec();
+            (*(m.encoder))[enc::tsk::encode      ].exec();
+            (*(m.modem)  )[mdm::tsk::modulate    ].exec();
+            (*(m.channel))[chn::tsk::add_noise   ].exec();
+            (*(m.modem)  )[mdm::tsk::demodulate  ].exec();
+            (*(m.decoder))[dec::tsk::decode_siho ].exec();
+            (*(m.monitor))[mnt::tsk::check_errors].exec();
+        }
         u.terminal->final_report();
         m.monitor->reset();
         u.terminal->reset();
